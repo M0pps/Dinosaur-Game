@@ -1,0 +1,219 @@
+import pygame
+import os
+import random
+pygame.init()
+pygame.font.init()
+pygame.mixer.init()
+
+clock = pygame.time.Clock()
+
+TIMER_FONT = pygame.font.SysFont("comicsans", 60)
+LIFE_COUNT_FONT = pygame.font.SysFont("comicsans", 40)
+DEATH_FONT = pygame.font.SysFont("comicsans", 100)
+DEATH_TIME_FONT = pygame.font.SysFont("comicsans", 60)
+
+WIDTH, HEIGHT = 1000, 1000
+WIN = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Animation in Act")
+
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+
+FPS = 45
+VEL = 20
+
+COUNTER = 0
+TIME_COUNTER = pygame.USEREVENT + 2
+pygame.time.set_timer(TIME_COUNTER, 1000)
+
+milliseconds_delay = 1500
+METEORITE_SPAWN_EVENT = pygame.USEREVENT + 1
+pygame.time.set_timer(METEORITE_SPAWN_EVENT, milliseconds_delay)
+m_x_val = 0
+
+IDLE_CROCODILE_WIDTH, IDLE_CROCODILE_HEIGHT = 160, 160
+TRANSITION_CROCODILE_WIDTH, TRANSITION_CROCODILE_HEIGHT = 200, 97
+RUN_CROCODILE_WIDTH, RUN_CROCODILE_HEIGHT = 225, 92
+
+METEOR_WIDTH, METEOR_HEIGHT = 200, 200
+
+direction_right = False
+direction_left = False
+
+face_right = True
+face_left = False
+
+isJump = False
+jumpCount = 10
+
+walkCount = 0
+idleCount = 0
+
+meteorite_count = []
+croc_health = 3
+
+BACKGROUND = pygame.transform.scale(pygame.image.load(os.path.join("Assets", "sky_background.png")), (WIDTH, HEIGHT))
+GROUND = pygame.transform.scale(pygame.image.load(os.path.join("Assets", "dirt_ground.png")), (WIDTH, HEIGHT))
+
+METEORITE = pygame.transform.scale(pygame.image.load(os.path.join("Assets", "meteor.png")), (METEOR_WIDTH, METEOR_HEIGHT))
+
+CROC_RIGHT_IDLE_1 = pygame.transform.scale(pygame.image.load(os.path.join("Croc_idle", "idle_1.png")), (IDLE_CROCODILE_WIDTH, IDLE_CROCODILE_HEIGHT))
+CROC_RIGHT_IDLE_2 = pygame.transform.scale(pygame.image.load(os.path.join("Croc_idle", "idle_2.png")), (IDLE_CROCODILE_WIDTH, IDLE_CROCODILE_HEIGHT))
+CROC_RIGHT_IDLE_3 = pygame.transform.scale(pygame.image.load(os.path.join("Croc_idle", "idle_3.png")), (IDLE_CROCODILE_WIDTH, IDLE_CROCODILE_HEIGHT))
+CROC_RIGHT_IDLE_4 = pygame.transform.scale(pygame.image.load(os.path.join("Croc_idle", "idle_4.png")), (IDLE_CROCODILE_WIDTH, IDLE_CROCODILE_HEIGHT))
+
+CROC_LEFT_IDLE_1 = pygame.transform.flip(CROC_RIGHT_IDLE_1, True, False)
+CROC_LEFT_IDLE_2 = pygame.transform.flip(CROC_RIGHT_IDLE_2, True, False)
+CROC_LEFT_IDLE_3 = pygame.transform.flip(CROC_RIGHT_IDLE_3, True, False)
+CROC_LEFT_IDLE_4 = pygame.transform.flip(CROC_RIGHT_IDLE_4, True, False)
+
+CROC_RIGHT_TRANSITION = pygame.transform.scale(pygame.image.load(os.path.join("Croc_run", "run_transition.png")), (TRANSITION_CROCODILE_WIDTH, TRANSITION_CROCODILE_HEIGHT))
+CROC_RIGHT_RUN_1 = pygame.transform.scale(pygame.image.load(os.path.join("Croc_run", "run_horizontal_1.png")), (RUN_CROCODILE_WIDTH, RUN_CROCODILE_HEIGHT))
+CROC_RIGHT_RUN_2 = pygame.transform.scale(pygame.image.load(os.path.join("Croc_run", "run_horizontal_2.png")), (RUN_CROCODILE_WIDTH, RUN_CROCODILE_HEIGHT))
+
+CROC_LEFT_TRANSITION = pygame.transform.flip(CROC_RIGHT_TRANSITION, True, False)
+CROC_LEFT_RUN_1 = pygame.transform.flip(CROC_RIGHT_RUN_1, True, False)
+CROC_LEFT_RUN_2 = pygame.transform.flip(CROC_RIGHT_RUN_2, True, False)
+
+walkRight = [CROC_RIGHT_RUN_1, CROC_RIGHT_RUN_2, CROC_RIGHT_RUN_1, CROC_RIGHT_RUN_2, CROC_RIGHT_RUN_1, CROC_RIGHT_RUN_2, CROC_RIGHT_RUN_1, CROC_RIGHT_RUN_2]
+walkLeft = [CROC_LEFT_RUN_1, CROC_LEFT_RUN_2, CROC_LEFT_RUN_1, CROC_LEFT_RUN_2, CROC_LEFT_RUN_1, CROC_LEFT_RUN_2, CROC_LEFT_RUN_1, CROC_LEFT_RUN_2]
+
+idle_right = [CROC_RIGHT_IDLE_1, CROC_RIGHT_IDLE_2, CROC_RIGHT_IDLE_3, CROC_RIGHT_IDLE_4]
+idle_left = [CROC_LEFT_IDLE_1, CROC_LEFT_IDLE_2, CROC_LEFT_IDLE_3, CROC_LEFT_IDLE_4]
+
+
+def draw_window(crocodile, meteorite_x):
+    global walkCount, idleCount
+    WIN.blit(BACKGROUND, (0, 0))
+    WIN.blit(GROUND, (0, 600))
+
+    time_text = TIMER_FONT.render(str(COUNTER), 1, BLACK)
+    WIN.blit(time_text, (WIDTH // 2, 0))
+
+    life_text = LIFE_COUNT_FONT.render("LIVES: " + str(croc_health), 1, BLACK)
+    WIN.blit(life_text, (10, 0))
+
+    if walkCount + 1 >= 24:
+        walkCount = 0
+    if idleCount + 1 >= 12:
+        idleCount = 0
+
+    if direction_left:
+        WIN.blit(walkLeft[walkCount // 3], (crocodile.x, crocodile.y))
+        walkCount += 1
+    elif direction_right:
+        WIN.blit(walkRight[walkCount // 3], (crocodile.x, crocodile.y))
+        walkCount += 1
+    else:
+        if face_left:
+            WIN.blit(idle_left[idleCount // 3], (crocodile.x, crocodile.y))
+            idleCount += 1
+        elif face_right:
+            WIN.blit(idle_right[idleCount // 3], (crocodile.x, crocodile.y))
+            idleCount += 1
+
+    for meteorite in meteorite_count:
+        WIN.blit(METEORITE, (meteorite_x, meteorite.y))
+
+    pygame.display.update()
+
+
+def handle_meteorite(meteorite_count, crocodile):
+    global croc_health
+    for meteorite in meteorite_count:
+        meteorite.y += 30
+        if meteorite.colliderect(crocodile):
+            pygame.event.post(pygame.event.Event(METEORITE_SPAWN_EVENT))
+            croc_health -= 1
+            meteorite_count.remove(meteorite)
+        elif meteorite.y > 700:
+            meteorite_count.remove(meteorite)
+
+
+def draw_death(text, s_text):
+    draw_text = DEATH_FONT.render(text, 1, BLACK)
+    score_text = DEATH_TIME_FONT.render(s_text, 1, BLACK)
+    WIN.blit(draw_text, (WIDTH / 2 - draw_text.get_width() / 2, HEIGHT / 2 - draw_text.get_height() - 175 / 2))
+    WIN.blit(score_text, (WIDTH / 2 - score_text.get_width() / 2, HEIGHT / 2 - score_text.get_height() + 150 / 2))
+    pygame.display.update()
+    pygame.time.delay(5000)
+    quit()
+
+def handle_croc_movement(keys_pressed, crocodile):
+    global direction_right, direction_left, isJump, walkCount, jumpCount, face_right, face_left
+
+    if keys_pressed[pygame.K_a] and crocodile.x - VEL > 0:
+        crocodile.x -= VEL
+        direction_left = True
+        direction_right = False
+        face_left = True
+        face_right = False
+    elif keys_pressed[pygame.K_d] and crocodile.x + VEL + IDLE_CROCODILE_WIDTH < WIDTH:
+        crocodile.x += VEL
+        direction_left = False
+        direction_right = True
+        face_left = False
+        face_right = True
+    else:
+        direction_left = False
+        direction_right = False
+        walkCount = 0
+
+    if not isJump:
+        if keys_pressed[pygame.K_SPACE]:
+            isJump = True
+            walkCount = 0
+    else:
+        if jumpCount >= -10:
+            neg = 1
+            if jumpCount < 0:
+                neg = -1
+            crocodile.y -= (jumpCount ** 2) * 0.5 * neg
+            jumpCount -= 1
+        else:
+            isJump = False
+            jumpCount = 10
+            crocodile.y = 700
+
+def main():
+    global m_x_val, COUNTER
+    crocodile = pygame.Rect(100, 700, IDLE_CROCODILE_WIDTH, IDLE_CROCODILE_HEIGHT)
+
+
+    run = True
+    while run:
+        clock.tick(FPS)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+                pygame.quit()
+            if event.type == TIME_COUNTER:
+                COUNTER += 1
+
+            if event.type == METEORITE_SPAWN_EVENT:
+                meteorite_x = random.randint(100, 900)
+                m_x_val = meteorite_x
+                meteorite = pygame.Rect(meteorite_x, 0, METEOR_WIDTH, METEOR_HEIGHT)
+                meteorite_count.append(meteorite)
+                draw_window(crocodile, meteorite_x)
+
+
+        death_text = ""
+        score_text = ""
+        if croc_health <= 0:
+            death_text = "EXTINCT"
+            score_text = "TIME ELAPSED: " + str(COUNTER)
+        if death_text != "":
+            draw_death(death_text, score_text)
+            break
+
+        keys_pressed = pygame.key.get_pressed()
+        handle_croc_movement(keys_pressed, crocodile)
+
+        handle_meteorite(meteorite_count, crocodile)
+
+        draw_window(crocodile, m_x_val)
+main()
+
+if __name__ == "__main__":
+    main()
